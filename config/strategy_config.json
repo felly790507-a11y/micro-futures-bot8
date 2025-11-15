@@ -1,0 +1,13 @@
+{
+  "risk": {
+    "stoploss_atr_mult": 2.0,
+    "takeprofit_atr_mult": 3.0,
+    "max_ticks": 50,
+    "max_minutes": 30
+  },
+  "decision": {
+    "entry_threshold": 0.15,
+    "exit_threshold": -0.05,
+    "bias_prob_threshold": 0.6
+  }
+}

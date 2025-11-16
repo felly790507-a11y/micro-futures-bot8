@@ -87,11 +87,17 @@ else:
         {"date": settlement_days + cb_meetings,
          "event": ["台指期貨結算日"] * len(settlement_days) + ["央行利率會議"] * len(cb_meetings)}
     )
+    df_events["date"] = pd.to_datetime(df_events["date"])  # 確保型別一致
     df_events.to_csv("events.csv", index=False)
 
     # ====== 事件標記 ======
-    df["event_flag"] = pd.Series(df.index.normalize()).isin(pd.to_datetime(df_events["date"]))
+    df["event_flag"] = df.index.normalize().isin(df_events["date"])
     df = df.merge(df_events, left_on=df.index.normalize(), right_on="date", how="left")
+
+    # 修正索引：重新設回 DatetimeIndex
+    df["datetime"] = df.index
+    df.set_index("datetime", inplace=True)
+
     print("✅ 已標記事件日")
 
     # 存檔：1 分 K
@@ -99,7 +105,7 @@ else:
     print(f"✅ 已存成 kbars_6m.csv｜筆數：{len(df)}")
 
     # ====== 週期轉換：5 分 K ======
-    df_5m = df.resample("5T").agg({
+    df_5m = df.resample("5min").agg({
         "open": "first",
         "high": "max",
         "low": "min",

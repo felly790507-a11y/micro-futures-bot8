@@ -1,7 +1,31 @@
-{
-config.json
-strategy_v4/config.json
-}
-strategy_v4/config.json
-config.json
+
 .gitignore
+.vscode/
+# Python 編譯與快取
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 虛擬環境
+venv/
+env/
+.venv/
+
+# VS Code 個人設定
+.vscode/
+
+# 測試或暫存檔案
+*.log
+*.csv
+*.tmp
+
+# 本地設定檔（避免推到 GitHub）
+config.json
+
+# Jupyter Notebook 檔案快取
+.ipynb_checkpoints/
+
+# 系統檔案
+.DS_Store
+Thumbs.db

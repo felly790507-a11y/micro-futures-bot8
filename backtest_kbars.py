@@ -95,7 +95,7 @@ else:
     df = df.merge(df_events, left_on=df.index.normalize(), right_on="date", how="left")
 
     # 修正索引：重新設回 DatetimeIndex
-    df["datetime"] = df.index
+    df["datetime"] = pd.to_datetime(df["datetime"])
     df.set_index("datetime", inplace=True)
 
     print("✅ 已標記事件日")

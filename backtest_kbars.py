@@ -31,16 +31,55 @@ end_date = today.strftime("%Y-%m-%d")
 print(f"🔎 抓取 {contract.code}｜期間：{start_date} ~ {end_date}")
 
 # ====== 抓取 K 線 ======
-kbars = api.kbars(
-    contract=contract,
-    start=start_date,
-    end=end_date
-)
+try:
+    kbars = api.kbars(contract=contract, start=start_date, end=end_date)
+    df = pd.DataFrame({**kbars})
+except Exception as e:
+    print("❌ 抓取 K 線失敗:", e)
+    df = pd.DataFrame()
 
-df = pd.DataFrame({**kbars})
+# ====== 資料整理與存檔 ======
 if df.empty:
     print("⚠️ 沒有抓到 K 線資料，請確認日期區間或合約是否正確")
 else:
-    df["ts"] = pd.to_datetime(df["ts"])
-    df.to_csv("kbars_6m.csv", index=False)
+    # 欄位改名
+    df.rename(columns={
+        "ts": "datetime",
+        "Open": "open",
+        "High": "high",
+        "Low": "low",
+        "Close": "close",
+        "Volume": "volume",
+        "Amount": "amount"
+    }, inplace=True)
+
+    # 時間轉換與索引
+    df["datetime"] = pd.to_datetime(df["datetime"])
+    df.set_index("datetime", inplace=True)
+
+    # ====== 事件標記（歷史 + 未來） ======
+    try:
+        events = pd.read_csv("events.csv")
+        events["date"] = pd.to_datetime(events["date"]).dt.date
+        df["event"] = df.index.date.astype(str).isin(events["date"].astype(str))
+        df = df.merge(events, left_on=df.index.date, right_on="date", how="left")
+        print("✅ 已標記事件日")
+    except FileNotFoundError:
+        print("⚠️ 未找到 events.csv，跳過事件標記")
+
+    # 存檔：1 分 K（覆蓋舊檔）
+    df.to_csv("kbars_6m.csv", mode="w")
     print(f"✅ 已存成 kbars_6m.csv｜筆數：{len(df)}")
+
+    # ====== 週期轉換：5 分 K ======
+    df_5m = df.resample("5T").agg({
+        "open": "first",
+        "high": "max",
+        "low": "min",
+        "close": "last",
+        "volume": "sum",
+        "amount": "sum"
+    }).dropna()
+
+    df_5m.to_csv("kbars_5m.csv", mode="w")
+    print(f"✅ 已存成 kbars_5m.csv｜筆數：{len(df_5m)}")

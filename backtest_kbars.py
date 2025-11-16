@@ -2,6 +2,7 @@ import json
 import shioaji as sj
 import pandas as pd
 from datetime import datetime, timedelta
+import calendar
 
 # ====== 讀取設定與登入 ======
 with open("config.json", "r", encoding="utf-8") as f:
@@ -38,6 +39,27 @@ except Exception as e:
     print("❌ 抓取 K 線失敗:", e)
     df = pd.DataFrame()
 
+# ====== 定義事件計算函式 ======
+def get_settlement_days(year):
+    days = []
+    for month in range(1, 13):
+        max_day = calendar.monthrange(year, month)[1]
+        wednesdays = [day for day in range(1, max_day+1)
+                      if calendar.weekday(year, month, day) == 2]
+        if len(wednesdays) >= 3:
+            days.append(datetime(year, month, wednesdays[2]).date())
+    return days
+
+def get_central_bank_meetings(year):
+    meetings = []
+    for month in [3, 6, 9, 12]:
+        max_day = calendar.monthrange(year, month)[1]
+        thursdays = [day for day in range(1, max_day+1)
+                     if calendar.weekday(year, month, day) == 3]
+        if len(thursdays) >= 3:
+            meetings.append(datetime(year, month, thursdays[2]).date())
+    return meetings
+
 # ====== 資料整理與存檔 ======
 if df.empty:
     print("⚠️ 沒有抓到 K 線資料，請確認日期區間或合約是否正確")
@@ -57,17 +79,22 @@ else:
     df["datetime"] = pd.to_datetime(df["datetime"])
     df.set_index("datetime", inplace=True)
 
-    # ====== 事件標記（歷史 + 未來） ======
-    try:
-        events = pd.read_csv("events.csv")
-        events["date"] = pd.to_datetime(events["date"]).dt.date
-        df["event"] = df.index.date.astype(str).isin(events["date"].astype(str))
-        df = df.merge(events, left_on=df.index.date, right_on="date", how="left")
-        print("✅ 已標記事件日")
-    except FileNotFoundError:
-        print("⚠️ 未找到 events.csv，跳過事件標記")
+    # ====== 自動產生事件表 ======
+    settlement_days = get_settlement_days(today.year)
+    cb_meetings = get_central_bank_meetings(today.year)
 
-    # 存檔：1 分 K（覆蓋舊檔）
+    df_events = pd.DataFrame(
+        {"date": settlement_days + cb_meetings,
+         "event": ["台指期貨結算日"] * len(settlement_days) + ["央行利率會議"] * len(cb_meetings)}
+    )
+    df_events.to_csv("events.csv", index=False)
+
+    # ====== 事件標記 ======
+    df["event_flag"] = pd.Series(df.index.normalize()).isin(pd.to_datetime(df_events["date"]))
+    df = df.merge(df_events, left_on=df.index.normalize(), right_on="date", how="left")
+    print("✅ 已標記事件日")
+
+    # 存檔：1 分 K
     df.to_csv("kbars_6m.csv", mode="w")
     print(f"✅ 已存成 kbars_6m.csv｜筆數：{len(df)}")
 

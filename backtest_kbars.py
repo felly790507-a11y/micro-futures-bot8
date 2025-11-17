@@ -39,25 +39,27 @@ except Exception as e:
     print("❌ 抓取 K 線失敗:", e)
     df = pd.DataFrame()
 
-# ====== 定義事件計算函式 ======
-def get_settlement_days(year):
+# ====== 定義事件計算函式（跨年度） ======
+def get_settlement_days(years):
     days = []
-    for month in range(1, 13):
-        max_day = calendar.monthrange(year, month)[1]
-        wednesdays = [day for day in range(1, max_day+1)
-                      if calendar.weekday(year, month, day) == 2]
-        if len(wednesdays) >= 3:
-            days.append(datetime(year, month, wednesdays[2]).date())
+    for year in years:
+        for month in range(1, 13):
+            max_day = calendar.monthrange(year, month)[1]
+            wednesdays = [day for day in range(1, max_day+1)
+                          if calendar.weekday(year, month, day) == 2]
+            if len(wednesdays) >= 3:
+                days.append(datetime(year, month, wednesdays[2]).date())
     return days
 
-def get_central_bank_meetings(year):
+def get_central_bank_meetings(years):
     meetings = []
-    for month in [3, 6, 9, 12]:
-        max_day = calendar.monthrange(year, month)[1]
-        thursdays = [day for day in range(1, max_day+1)
-                     if calendar.weekday(year, month, day) == 3]
-        if len(thursdays) >= 3:
-            meetings.append(datetime(year, month, thursdays[2]).date())
+    for year in years:
+        for month in [3, 6, 9, 12]:
+            max_day = calendar.monthrange(year, month)[1]
+            thursdays = [day for day in range(1, max_day+1)
+                         if calendar.weekday(year, month, day) == 3]
+            if len(thursdays) >= 3:
+                meetings.append(datetime(year, month, thursdays[2]).date())
     return meetings
 
 # ====== 資料整理與存檔 ======
@@ -79,29 +81,36 @@ else:
     df["datetime"] = pd.to_datetime(df["datetime"])
     df.set_index("datetime", inplace=True)
 
-    # ====== 自動產生事件表 ======
-    settlement_days = get_settlement_days(today.year)
-    cb_meetings = get_central_bank_meetings(today.year)
+    # ====== 自動產生跨年度事件表 ======
+    years = list(range(six_months_ago.year, today.year + 1))
+    settlement_days = get_settlement_days(years)
+    cb_meetings = get_central_bank_meetings(years)
 
     df_events = pd.DataFrame(
         {"date": settlement_days + cb_meetings,
          "event": ["台指期貨結算日"] * len(settlement_days) + ["央行利率會議"] * len(cb_meetings)}
     )
+
+    # 加入交割日（Shioaji 合約屬性）
+    delivery_date = contract.delivery_date
+    df_delivery = pd.DataFrame([{
+        "date": pd.to_datetime(delivery_date),
+        "event": "合約交割日"
+    }])
+    df_events = pd.concat([df_events, df_delivery], ignore_index=True)
+
     df_events["date"] = pd.to_datetime(df_events["date"])  # 確保型別一致
-    df_events.to_csv("events.csv", index=False)
+    df_events.to_csv("events.csv", index=False, encoding="utf-8-sig")
+    print("✅ 已建立跨年度 events.csv（含交割日）")
 
-    # ====== 事件標記 ======
-    df["event_flag"] = df.index.normalize().isin(df_events["date"])
-    df = df.merge(df_events, left_on=df.index.normalize(), right_on="date", how="left")
-
-    # 修正索引：重新設回 DatetimeIndex
-    df["datetime"] = pd.to_datetime(df["datetime"])
-    df.set_index("datetime", inplace=True)
-
+    # ====== 事件標記（用 map，不破壞結構） ======
+    event_map = dict(zip(df_events["date"], df_events["event"]))
+    df["event"] = df.index.normalize().map(event_map)
+    df["event_flag"] = df["event"].notna()
     print("✅ 已標記事件日")
 
     # 存檔：1 分 K
-    df.to_csv("kbars_6m.csv", mode="w")
+    df.to_csv("kbars_6m.csv", mode="w", encoding="utf-8-sig")
     print(f"✅ 已存成 kbars_6m.csv｜筆數：{len(df)}")
 
     # ====== 週期轉換：5 分 K ======
@@ -111,8 +120,9 @@ else:
         "low": "min",
         "close": "last",
         "volume": "sum",
-        "amount": "sum"
+        "amount": "sum",
+        "event_flag": "max"  # 保留事件標記
     }).dropna()
 
-    df_5m.to_csv("kbars_5m.csv", mode="w")
+    df_5m.to_csv("kbars_5m.csv", mode="w", encoding="utf-8-sig")
     print(f"✅ 已存成 kbars_5m.csv｜筆數：{len(df_5m)}")

@@ -125,8 +125,6 @@ Optimizer(ticks).find_best(param_grid, mode="regression_based", metric="avg_pnl"
 整合 VS Code tasks.json 一鍵回測與一鍵報告
 
 📌 事件整合與回測流程
-本專案已支援完整的事件標記與休市日整合，流程如下：
-
 執行 generate_taifex_calendar.py
 
 自動抓取 TAIFEX 官網休市日
@@ -163,3 +161,43 @@ kbars_6m.csv：六個月 1 分 K，含事件標記
 kbars_5m.csv：六個月 5 分 K，含事件標記
 
 event_flag_matrix.csv：事件矩陣（pivot 格式）
+
+🚦 快速導航流程
+讀 read → 快速解析 README，定位專案架構與進度
+
+事件 → 檢查事件模組（backtest_kbars.py、generate_taifex_calendar.py、event_flag_matrix.py、merge_event_matrix.py、event_summary.py）
+
+回測 → 跑 BacktestRunner.py、TradeAnalyzer.py、ResultVisualizer.py
+
+引擎 → 檢查 DecisionEngine.py、DecisionEngine_v2.py、StrategyState.py、TickEngine.py
+
+最佳化 → 跑 Optimizer.py、RegressionCalibrator.py、WalkforwardTester.py
+
+文件 → 補充 README 範例、API 使用說明
+
+🔧 Git 快速操作
+全部更新
+bash
+git add .
+git commit -m "🔧 更新全部檔案"
+git push origin main
+文件更新
+bash
+git add README.md
+git commit -m "📝 更新 README.md 文件"
+git push origin main
+程式更新
+bash
+git add backtest_kbars.py event_flag_matrix.py merge_event_matrix.py
+git commit -m "✨ 更新回測程式與事件整合模組"
+git push origin main
+新增檔案
+bash
+git add event_summary.py
+git commit -m "➕ 新增事件統計模組"
+git push origin main
+刪除檔案
+bash
+git rm README_architecture.md
+git commit -m "🗑 移除舊版架構文件"
+git push origin main

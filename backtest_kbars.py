@@ -99,15 +99,37 @@ else:
     }])
     df_events = pd.concat([df_events, df_delivery], ignore_index=True)
 
-    df_events["date"] = pd.to_datetime(df_events["date"])  # 確保型別一致
-    df_events.to_csv("events.csv", index=False, encoding="utf-8-sig")
-    print("✅ 已建立跨年度 events.csv（含交割日）")
+    # 加入休市日（來自 taifex_calendar.csv）
+    try:
+        df_calendar = pd.read_csv("taifex_calendar.csv", parse_dates=["date"])
+        df_calendar["event"] = df_calendar["holiday_name"]
+        df_calendar = df_calendar[["date", "event"]]
+        df_events = pd.concat([df_events, df_calendar], ignore_index=True)
+    except Exception as e:
+        print(f"⚠️ 無法載入 taifex_calendar.csv：{e}")
 
-    # ====== 事件標記（用 map，不破壞結構） ======
+    # 去除重複日期（保留第一筆事件）
+    df_events.drop_duplicates(subset=["date"], keep="first", inplace=True)
+    df_events["date"] = pd.to_datetime(df_events["date"])
+    df_events.sort_values("date", inplace=True)
+    df_events.to_csv("events.csv", index=False, encoding="utf-8-sig")
+    print("✅ 已整合並建立 events.csv（含交割日與休市日）")
+
+    # ====== 標記事件與休市日 ======
     event_map = dict(zip(df_events["date"], df_events["event"]))
     df["event"] = df.index.normalize().map(event_map)
     df["event_flag"] = df["event"].notna()
-    print("✅ 已標記事件日")
+
+    # 標記休市日（來自 taifex_calendar.csv）
+    try:
+        df_calendar = pd.read_csv("taifex_calendar.csv", parse_dates=["date"])
+        holiday_map = dict(zip(df_calendar["date"], df_calendar["is_holiday"]))
+        df["is_holiday"] = df.index.normalize().map(holiday_map).fillna(0).astype(int)
+    except Exception as e:
+        df["is_holiday"] = 0
+        print(f"⚠️ 無法標記休市日：{e}")
+
+    print("✅ 已標記事件日與休市日")
 
     # 存檔：1 分 K
     df.to_csv("kbars_6m.csv", mode="w", encoding="utf-8-sig")
@@ -121,7 +143,8 @@ else:
         "close": "last",
         "volume": "sum",
         "amount": "sum",
-        "event_flag": "max"  # 保留事件標記
+        "event_flag": "max",
+        "is_holiday": "max"
     }).dropna()
 
     df_5m.to_csv("kbars_5m.csv", mode="w", encoding="utf-8-sig")

@@ -12,6 +12,7 @@ simulation_mode = config.get("simulation", False)
 api_key = config["api_key"]
 secret_key = config["secret_key"]
 
+# 初始化 Shioaji API
 api = sj.Shioaji(simulation=simulation_mode)
 api.login(api_key=api_key, secret_key=secret_key, contracts_timeout=10000)
 print(f"✅ 登入成功｜模式：{'模擬' if simulation_mode else '真實'}")
@@ -41,6 +42,7 @@ except Exception as e:
 
 # ====== 定義事件計算函式（跨年度） ======
 def get_settlement_days(years):
+    """計算每月第三個星期三（台指期貨結算日）"""
     days = []
     for year in years:
         for month in range(1, 13):
@@ -52,6 +54,7 @@ def get_settlement_days(years):
     return days
 
 def get_central_bank_meetings(years):
+    """計算每季第三個星期四（央行利率會議日）"""
     meetings = []
     for year in years:
         for month in [3, 6, 9, 12]:
@@ -131,7 +134,7 @@ else:
 
     print("✅ 已標記事件日與休市日")
 
-    # 存檔：1 分 K
+    # ====== 存檔：1 分 K ======
     df.to_csv("kbars_6m.csv", mode="w", encoding="utf-8-sig")
     print(f"✅ 已存成 kbars_6m.csv｜筆數：{len(df)}")
 
